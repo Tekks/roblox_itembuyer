@@ -1,21 +1,38 @@
 import requests
 import pathlib
 import time
+import sqlite3
 import os
 from rich.console import Console
 from dotenv import load_dotenv
 
-load_dotenv()
-__version__ = '1.0.0'
-cookie = os.getenv("COOKIE")
+__version__ = '1.1.0'
 
+# Env
+load_dotenv()
+cookie = os.getenv("COOKIE")
+idleTimeBetweenRunsInMin = int(os.getenv("IDLE_TIME_BETWEEN_RUNS_IN_MIN"))
+debug = bool(os.getenv("DEBUG") == "true" or os.getenv("DEBUG") == "True")
+
+
+# DB Sqlite
+con = sqlite3.connect("db/items.db")
+cur = con.cursor()
+cur.execute("CREATE TABLE IF NOT EXISTS items (productId INTEGER PRIMARY KEY)")
+
+# Session
 session = requests.Session()
 session.cookies.update({".ROBLOSECURITY": cookie})
 
 console = Console(highlight=False)
 
-def cprint(color: str, type: str, content: str) -> None:
+def logInfo(color: str, type: str, content: str) -> None:
     console.print(f"[ [bold {color}]{type}[/] ] {content}")
+
+def logDebug(color: str, type: str, content: str) -> None:
+    if debug is False:
+        return
+    logInfo(color, type, content)
 
 def fetch_items() -> None:
     result = {}
@@ -26,7 +43,7 @@ def fetch_items() -> None:
         res = req.json()
 
         if req.status_code == 429:
-            cprint("red", "X", "Roblox Rate-Limit reached. Waiting 20 seconds")
+            logInfo("red", "X", "Roblox Rate-Limit reached. Waiting 20 seconds")
             time.sleep(20)
             continue
 
@@ -35,10 +52,16 @@ def fetch_items() -> None:
             itemRestrictions = item.get("itemRestrictions")
             itemId = item.get("productId")
             if "Collectible" in item.get("itemRestrictions"):
-                cprint("red", "-", f"Item Limited: \"{itemId} :: {itemName}\"")
+                logDebug("red", "-", f"Item Limited: \"{itemId} :: {itemName}\"")
                 continue
+
+            cur.execute("SELECT * FROM items WHERE productId=?", (itemId,))
+            if cur.fetchone() is not None:
+                logDebug("red", "-", f"Item Already Purchased: \"{itemId} :: {itemName}\"")
+                continue
+            
             result[itemId] = { "name": itemName, "restrictions": itemRestrictions }
-            cprint("blue", "?", f"Item Found: \"{itemId} :: {itemName}\"")
+            logInfo("blue", "?", f"Item Found: \"{itemId} :: {itemName}\"")
 
         cursor = res.get("nextPageCursor")
 
@@ -57,9 +80,13 @@ def purchase(productName: str, productId: int) -> None:
         )
 
         if req.status_code == 429:
-            cprint("red", "X", "Roblox Rate-Limit reached. Waiting 60 seconds")
+            logInfo("red", "X", "Roblox Rate-Limit reached. Waiting 60 seconds")
             time.sleep(60)
             continue
+
+        # add id to db
+        cur.execute("INSERT INTO items VALUES (?)", (productId,))
+        con.commit()
 
         res = req.json()
         if "reason" in res and res.get("reason") == "AlreadyOwned":
@@ -68,20 +95,26 @@ def purchase(productName: str, productId: int) -> None:
 
 
 def main() -> None:
-    cprint("yellow", "!", "Roblox ItemBuyer v" + __version__)
-    freeItems = fetch_items()
-    freeItems = { key: value for (key, value) in freeItems.items() if "Collectible" not in value["restrictions"] }
-    cprint("yellow", "!", f"Found {len(freeItems)} free items")
+    logInfo("yellow", "!", "Roblox ItemBuyer v" + __version__)
     
-    currentItemCount = 0
+    while True:
+        freeItems = fetch_items()
+        freeItems = { key: value for (key, value) in freeItems.items() if "Collectible" not in value["restrictions"] }
+        logInfo("yellow", "!", f"Found {len(freeItems)} free items")
+        
+        currentItemCount = 0
 
-    for productId, item in freeItems.items():
-        currentItemCount += 1
-        result = purchase(item["name"], productId)
-        if result == "owned":
-            cprint("yellow", "-", f"{currentItemCount} / {len(freeItems)} :: Already purchased: \"{item['name']}\"")
-        elif result == "purchased":
-            cprint("green", "+", f"{currentItemCount} / {len(freeItems)} :: Purchased: \"{item['name']}\"")
-        time.sleep(5)
+        for productId, item in freeItems.items():
+            currentItemCount += 1
+            result = purchase(item["name"], productId)
+            if result == "owned":
+                logDebug("yellow", "-", f"{currentItemCount} / {len(freeItems)} :: Already purchased: \"{item['name']}\"")
+            elif result == "purchased":
+                logInfo("green", "+", f"{currentItemCount} / {len(freeItems)} :: Purchased: \"{item['name']}\"")
+            time.sleep(2)
+
+        formatedDate = time.strftime("%H:%M:%S %d/%m/%Y", time.localtime(time.time() + (idleTimeBetweenRunsInMin * 60)))
+        logInfo("yellow", "!", f"Next run will be at {formatedDate}")
+        time.sleep(idleTimeBetweenRunsInMin * 60)
 
 main()

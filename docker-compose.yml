@@ -4,5 +4,12 @@ services:
     image: nottekks/roblox_itembuyer:latest
     container_name: roblox_itembuyer
     restart: unless-stopped
+    volumes:
+      - db:/app/db
     environment:
-      - COOKIE=<YOUR COOKIE HERE>
+      - COOKIE=<YOUR COOKIE HERE> 
+      - IDLE_TIME_BETWEEN_RUNS_IN_MIN=600
+      - DEBUG=False
+
+volumes:
+  db:
