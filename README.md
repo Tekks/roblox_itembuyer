@@ -25,13 +25,13 @@ Originally made by [insaneinthamembrane](https://github.com/insaneinthamembrane/
 - Place the Cookie as environment variable `COOKIE` ( see example below )
 
 ### Steps
-1. Use Docker compose to build and run the container
-```
+1. Use Docker compose to build and run the container [docker-compose.yml](docker-compose.yml)
+```yml
 version: "3.9"
 services:
-  roblox_itemBuyer:
+  roblox_itembuyer:
     image: nottekks/roblox_itembuyer:latest
-    container_name: rroblox_itembuyer
+    container_name: roblox_itembuyer
     restart: unless-stopped
     environment:
       - COOKIE=<YOUR COOKIE HERE>
