@@ -1,9 +1,13 @@
 import requests
 import pathlib
 import time
+import os
 from rich.console import Console
+from dotenv import load_dotenv
 
-cookie = pathlib.Path("cookie.txt").read_text()
+load_dotenv()
+__version__ = '1.0.0'
+cookie = os.getenv("COOKIE")
 
 session = requests.Session()
 session.cookies.update({".ROBLOSECURITY": cookie})
@@ -64,7 +68,7 @@ def purchase(productName: str, productId: int) -> None:
 
 
 def main() -> None:
-    cprint("yellow", "!", "Roblox ItemBuyer v1.0.1")
+    cprint("yellow", "!", "Roblox ItemBuyer v" + __version__)
     freeItems = fetch_items()
     freeItems = { key: value for (key, value) in freeItems.items() if "Collectible" not in value["restrictions"] }
     cprint("yellow", "!", f"Found {len(freeItems)} free items")

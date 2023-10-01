@@ -1,0 +1,81 @@
+name: Push and Tag
+
+on:
+  workflow_dispatch:
+
+jobs:
+  dockerhubpush:
+    name: Push to DockerHub
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    
+    outputs:
+      VERSION: ${{ steps.version-step.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Get version
+        id: version-step
+        uses: michmich112/extract-version@main
+        with:
+          version-file: main.py
+          schema: major.minor.build
+
+      - name: Set env VERSION
+        run: echo "VERSION=${{ steps.version-step.outputs.version }}" >> $GITHUB_OUTPUT
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/roblox_itembuyer:${{ steps.version-step.outputs.version }},${{ secrets.DOCKERHUB_USERNAME }}/roblox_itembuyer:latest
+      
+  tagging:
+    name: Version Tagging
+    needs: dockerhubpush
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 100
+      
+      - name: Bump version and push tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: ${{ needs.dockerhubpush.outputs.VERSION }}
+
+
+      - name: Create Release
+        uses: fregante/release-with-changelog@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          exclude: '^Meta'
+          commit-template: '- {title} ← {hash}'
+          template: |
+            ### Changelog
+  
+            {commits}
+  
+            {range}

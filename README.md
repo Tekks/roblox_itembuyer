@@ -9,7 +9,7 @@ Originally made by [insaneinthamembrane](https://github.com/insaneinthamembrane/
 - pip
 - git / zip
 - Roblox Cookie ( `.ROBLOSECURITY` ) ( [How to get it](https://www.youtube.com/watch?v=O9iPTvXnpnU) )
-- Place the Cookie ind the `cookie.txt` file
+- Place the Cookie in the `cookie.txt` file
 
 ### Steps
 1. Pull the repository
@@ -22,10 +22,17 @@ Originally made by [insaneinthamembrane](https://github.com/insaneinthamembrane/
 ### Requirements
 - Docker
 - Roblox Cookie ( `.ROBLOSECURITY` ) ( [How to get it](https://www.youtube.com/watch?v=O9iPTvXnpnU) )
-- Place the Cookie ind the `cookie.txt` file
+- Place the Cookie as environment variable `COOKIE` ( see example below )
 
 ### Steps
-1. Pull the repository
-2. Build the image with `docker build -t roblox_itemBuyer .`
-3. Run the image with `docker run -it --rm -v $(pwd):/app roblox_itemBuyer`
-4. Wait for the script to finish
+1. Use Docker compose to build and run the container
+```
+version: "3.9"
+services:
+  roblox_itemBuyer:
+    image: nottekks/roblox_itembuyer:latest
+    container_name: rroblox_itembuyer
+    restart: unless-stopped
+    environment:
+      - COOKIE=<YOUR COOKIE HERE>
+```
